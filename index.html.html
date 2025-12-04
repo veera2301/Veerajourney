@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sri Computers – Complete Management System</title>
+<style>
+ body{font-family:Arial;margin:0;background:#f5f7fb}
+ header{background:#0b63d6;color:#fff;padding:14px 22px;font-size:22px;font-weight:bold}
+ .tabs{display:flex;background:#fff;border-bottom:1px solid #ddd;overflow-x:auto}
+ .tab{padding:12px 18px;cursor:pointer;font-size:15px;white-space:nowrap}
+ .tab.active{background:#0b63d6;color:white}
+ .page{display:none;padding:20px}
+ .page.active{display:block}
+ label{display:block;margin-top:10px;font-weight:600}
+ input,select,textarea{width:100%;padding:8px;margin-top:4px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box}
+ button{margin-top:12px;padding:10px 14px;background:#0b63d6;color:#fff;border:none;border-radius:5px;cursor:pointer}
+ button:hover{background:#0952b8}
+ table{width:100%;border-collapse:collapse;margin-top:15px}
+ th,td{border:1px solid #ccc;padding:8px;text-align:left}
+ .svc-row{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+ .svc-row>*{flex:1;min-width:120px}
+ .search-row{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+ .search-row>*{flex:1;min-width:150px}
+ .status{position:fixed;top:10px;right:10px;background:#4CAF50;color:white;padding:8px 12px;border-radius:4px;font-size:12px;z-index:1000}
+ .edit-btn{background:#FF9800;margin-left:5px}
+ .cancel-btn{background:#f44336}
+ .invoice-items{margin:20px 0}
+ .inv-row{display:grid;grid-template-columns:1fr 2fr 1fr 1fr 1fr 80px;gap:8px;margin-top:8px;align-items:end}
+ 
+ @media print {
+   body{background:white}
+   header,.tabs,.no-print,button{display:none!important}
+   .page{display:block!important;padding:0}
+   .print-area{display:block!important}
+   table{page-break-inside:avoid}
+ }
+ 
+ .print-area{display:none}
+ .print-area.active{display:block;background:white;padding:40px;max-width:210mm;margin:0 auto}
+ .invoice-header{text-align:center;margin-bottom:30px;border-bottom:3px solid #0b63d6;padding-bottom:20px}
+ .invoice-header h1{margin:0;color:#0b63d6;font-size:32px}
+ .invoice-header p{margin:5px 0;color:#666}
+ .invoice-details{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin:20px 0}
+ .invoice-table{width:100%;border-collapse:collapse;margin:20px 0}
+ .invoice-table th{background:#0b63d6;color:white;padding:12px;text-align:left}
+ .invoice-table td{padding:10px;border:1px solid #ddd}
+ .invoice-footer{margin-top:40px;text-align:right}
+ .total-section{background:#f5f7fb;padding:15px;display:inline-block;min-width:300px}
+</style>
+</head>
+<body>
+<div class="status">✓ IndexedDB Ready</div>
+<header>Sri Computers – Complete Management System</header>
+
+<div class="tabs">
+  <div class="tab active" data-page="customer">Customer</div>
+  <div class="tab" data-page="service">Service Sheet</div>
+  <div class="tab" data-page="invoice">Invoice/Print</div>
+  <div class="tab" data-page="followup">Follow-Up</div>
+  <div class="tab" data-page="export">Export</div>
+</div>
+
+<!-- CUSTOMER PAGE -->
+<div id="customer" class="page active">
+  <h2 id="custTitle">Customer Creation</h2>
+  <input type="hidden" id="editMode" value="false">
+  <label>Customer Code</label>
+  <input id="custCode" readonly>
+  <label>Name</label><input id="custName">
+  <label>Address</label><textarea id="custAddr"></textarea>
+  <label>Phone</label><input id="custPhone">
+  <label>GST</label><input id="custGst">
+  <label>Email</label><input id="custMail">
+  <button id="saveCustomer">Save Customer</button>
+  <button id="cancelEdit" class="cancel-btn" style="display:none">Cancel Edit</button>
+
+  <h3>Saved Customers</h3>
+  <div class="search-row">
+    <input id="searchName" placeholder="Search by Name...">
+    <input id="searchPhone" placeholder="Search by Phone...">
+    <button onclick="searchCustomers()">Search</button>
+    <button onclick="clearSearch()">Clear</button>
+  </div>
+  <table><thead><tr><th>Code</th><th>Name</th><th>Phone</th><th>Actions</th></tr></thead><tbody id="custBody"></tbody></table>
+</div>
+
+<!-- SERVICE PAGE -->
+<div id="service" class="page">
+  <h2>Service Sheet</h2>
+  <label>Customer Code</label>
+  <div style="display:flex;gap:10px">
+    <input id="svcCust">
+    <button id="loadCust">Load</button>
+  </div>
+  <label>Customer Name</label>
+  <input id="svcCustName" readonly>
+  <label>Service No</label>
+  <input id="svcNo" readonly>
+
+  <h3>Service Rows</h3>
+  <div id="serviceRows"></div>
+  <button id="addRow">Add Row</button>
+  <button id="saveService">Save Service</button>
+
+  <h3>Saved Services</h3>
+  <table><thead><tr><th>Service</th><th>Customer</th><th>Actions</th></tr></thead><tbody id="svcBody"></tbody></table>
+</div>
+
+<!-- INVOICE PAGE -->
+<div id="invoice" class="page">
+  <h2>Invoice / Print</h2>
+  
+  <div class="no-print">
+    <label>Invoice Number</label>
+    <input id="invNo" readonly>
+    
+    <label>Invoice Date</label>
+    <input type="date" id="invDate">
+    
+    <label>Service Sheet No (Optional)</label>
+    <input id="invServiceNo" placeholder="Link to service sheet">
+    
+    <label>Customer Code</label>
+    <div style="display:flex;gap:10px">
+      <input id="invCustCode">
+      <button onclick="loadInvCustomer()">Load</button>
+    </div>
+    
+    <label>Customer Name</label>
+    <input id="invCustName" readonly>
+    
+    <label>Customer Phone</label>
+    <input id="invCustPhone" readonly>
+    
+    <label>Customer Address</label>
+    <textarea id="invCustAddr" readonly></textarea>
+    
+    <h3>Invoice Items</h3>
+    <div class="invoice-items" id="invItems"></div>
+    <button onclick="addInvRow()">Add Item</button>
+    
+    <div style="margin-top:20px">
+      <label>Subtotal</label>
+      <input id="invSubtotal" readonly>
+      
+      <label>Discount (%)</label>
+      <input type="number" id="invDiscount" value="0" oninput="calculateInvTotal()">
+      
+      <label>Tax/GST (%)</label>
+      <input type="number" id="invTax" value="0" oninput="calculateInvTotal()">
+      
+      <label>Total Amount</label>
+      <input id="invTotal" readonly style="font-weight:bold;font-size:18px">
+    </div>
+    
+    <label>Payment Status</label>
+    <select id="invPayStatus">
+      <option>Paid</option>
+      <option>Pending</option>
+      <option>Partial</option>
+    </select>
+    
+    <label>Notes</label>
+    <textarea id="invNotes" placeholder="Additional notes..."></textarea>
+    
+    <button onclick="saveInvoice()">Save Invoice</button>
+    <button onclick="printInvoice()" style="background:#4CAF50">Print Invoice</button>
+    
+    <h3>Saved Invoices</h3>
+    <table>
+      <thead><tr><th>Invoice</th><th>Date</th><th>Customer</th><th>Amount</th><th>Actions</th></tr></thead>
+      <tbody id="invBody"></tbody>
+    </table>
+  </div>
+  
+  <!-- PRINT AREA -->
+  <div class="print-area" id="printArea">
+    <div class="invoice-header">
+      <h1>SRI COMPUTERS</h1>
+      <p>Computer Sales & Service Center</p>
+      <p>Phone: [Your Phone] | Email: [Your Email]</p>
+      <p>Address: [Your Address]</p>
+    </div>
+    
+    <h2 style="text-align:center;color:#0b63d6">TAX INVOICE</h2>
+    
+    <div class="invoice-details">
+      <div>
+        <strong>Invoice No:</strong> <span id="printInvNo"></span><br>
+        <strong>Invoice Date:</strong> <span id="printInvDate"></span><br>
+        <strong>Service No:</strong> <span id="printServiceNo"></span>
+      </div>
+      <div>
+        <strong>Bill To:</strong><br>
+        <span id="printCustName"></span><br>
+        <span id="printCustPhone"></span><br>
+        <span id="printCustAddr"></span>
+      </div>
+    </div>
+    
+    <table class="invoice-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Description</th>
+          <th>Qty</th>
+          <th>Rate</th>
+          <th>Amount</th>
+        </tr>
+      </thead>
+      <tbody id="printItems"></tbody>
+    </table>
+    
+    <div class="invoice-footer">
+      <div class="total-section">
+        <strong>Subtotal:</strong> ₹<span id="printSubtotal"></span><br>
+        <strong>Discount:</strong> <span id="printDiscount"></span>%<br>
+        <strong>Tax/GST:</strong> <span id="printTax"></span>%<br>
+        <hr>
+        <strong style="font-size:18px">Total: ₹<span id="printTotal"></span></strong>
+      </div>
+    </div>
+    
+    <div style="margin-top:40px">
+      <strong>Notes:</strong><br>
+      <span id="printNotes"></span>
+    </div>
+    
+    <div style="margin-top:60px;text-align:right">
+      <p>Authorized Signature: _________________</p>
+    </div>
+  </div>
+</div>
+
+<!-- FOLLOWUP -->
+<div id="followup" class="page">
+  <h2>Follow-Up</h2>
+  <label>Date</label><input type="date" id="fuDate">
+  <label>Name</label><input id="fuName">
+  <label>Phone</label><input id="fuPhone">
+  <label>Requirement</label><textarea id="fuReq"></textarea>
+  <label>Status</label><select id="fuStatus"><option>Pending</option><option>Completed</option></select>
+  <button id="saveFollow">Save</button>
+
+  <h3>Saved Follow-ups</h3>
+  <table><thead><tr><th>Date</th><th>Name</th><th>Phone</th><th>Req</th><th>Status</th></tr></thead><tbody id="fuBody"></tbody></table>
+</div>
+
+<!-- EXPORT PAGE -->
+<div id="export" class="page">
+  <h2>Export & Backup</h2>
+  <button id="exportCust">Export Customers</button>
+  <button id="exportSvc">Export Services</button>
+  <button id="exportInv">Export Invoices</button>
+  <button id="exportFollow">Export Follow-up</button>
+  <hr style="margin:20px 0">
+  <button id="backupAll" style="background:#FF9800">Backup All Data (JSON)</button>
+  <button id="restoreAll" style="background:#4CAF50">Restore from Backup</button>
+  <input type="file" id="restoreFile" accept=".json" style="display:none">
+</div>
+
+<script>
+// IndexedDB Setup
+let db;
+const DB_NAME = 'SriComputersDB';
+const DB_VERSION = 2;
+
+const initDB = () => {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      db = request.result;
+      resolve(db);
+    };
+    
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result;
+      
+      if (!db.objectStoreNames.contains('customers')) {
+        const custStore = db.createObjectStore('customers', { keyPath: 'code' });
+        custStore.createIndex('name', 'name', { unique: false });
+        custStore.createIndex('phone', 'phone', { unique: false });
+      }
+      
+      if (!db.objectStoreNames.contains('services')) {
+        db.createObjectStore('services', { keyPath: 'svc' });
+      }
+      
+      if (!db.objectStoreNames.contains('invoices')) {
+        db.createObjectStore('invoices', { keyPath: 'invNo' });
+      }
+      
+      if (!db.objectStoreNames.contains('followups')) {
+        db.createObjectStore('followups', { autoIncrement: true });
+      }
+    };
+  });
+};
+
+// Database operations
+const dbOps = {
+  async getAll(storeName) {
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(storeName, 'readonly');
+      const store = tx.objectStore(storeName);
+      const request = store.getAll();
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  },
+  
+  async add(storeName, data) {
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(storeName, 'readwrite');
+      const store = tx.objectStore(storeName);
+      const request = store.add(data);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  },
+  
+  async put(storeName, data) {
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(storeName, 'readwrite');
+      const store = tx.objectStore(storeName);
+      const request = store.put(data);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  },
+  
+  async get(storeName, key) {
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(storeName, 'readonly');
+      const store = tx.objectStore(storeName);
+      const request = store.get(key);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  },
+  
+  async delete(storeName, key) {
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(storeName, 'readwrite');
+      const store = tx.objectStore(storeName);
+      const request = store.delete(key);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  },
+  
+  async count(storeName) {
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(storeName, 'readonly');
+      const store = tx.objectStore(storeName);
+      const request = store.count();
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  }
+};
+
+// TAB SYSTEM
+const tabs = document.querySelectorAll('.tab');
+tabs.forEach(t => t.onclick = () => {
+  tabs.forEach(x => x.classList.remove('active'));
+  t.classList.add('active');
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(t.dataset.page).classList.add('active');
+});
+
+// CUSTOMER FUNCTIONS
+async function nextCust() {
+  const count = await dbOps.count('customers');
+  return `C${String(count + 1).padStart(4, '0')}`;
+}
+
+async function refreshCust(filtered) {
+  const customers = filtered || await dbOps.getAll('customers');
+  const tbody = document.getElementById('custBody');
+  tbody.innerHTML = '';
+  customers.forEach(c => {
+    tbody.innerHTML += `<tr>
+      <td>${c.code}</td>
+      <td>${c.name}</td>
+      <td>${c.phone}</td>
+      <td>
+        <button onclick="loadIntoService('${c.code}','${c.name}')">Load</button>
+        <button class="edit-btn" onclick="editCustomer('${c.code}')">Edit</button>
+      </td>
+    </tr>`;
+  });
+}
+
+async function editCustomer(code) {
+  const c = await dbOps.get('customers', code);
+  if (!c) return alert('Customer not found');
+  
+  document.getElementById('editMode').value = 'true';
+  document.getElementById('custTitle').innerText = 'Edit Customer';
+  custCode.value = c.code;
+  custName.value = c.name;
+  custAddr.value = c.addr;
+  custPhone.value = c.phone;
+  custGst.value = c.gst;
+  custMail.value = c.mail;
+  
+  document.getElementById('saveCustomer').innerText = 'Update Customer';
+  document.getElementById('cancelEdit').style.display = 'inline-block';
+  
+  window.scrollTo(0, 0);
+}
+
+document.getElementById('cancelEdit').onclick = async () => {
+  document.getElementById('editMode').value = 'false';
+  document.getElementById('custTitle').innerText = 'Customer Creation';
+  document.getElementById('saveCustomer').innerText = 'Save Customer';
+  document.getElementById('cancelEdit').style.display = 'none';
+  clearCustomerForm();
+  custCode.value = await nextCust();
+};
+
+function clearCustomerForm() {
+  custName.value = '';
+  custAddr.value = '';
+  custPhone.value = '';
+  custGst.value = '';
+  custMail.value = '';
+}
+
+async function searchCustomers() {
+  const all = await dbOps.getAll('customers');
+  const name = searchName.value.toLowerCase();
+  const phone = searchPhone.value.toLowerCase();
+  const filtered = all.filter(c => {
+    const matchName = !name || c.name.toLowerCase().includes(name);
+    const matchPhone = !phone || c.phone.toLowerCase().includes(phone);
+    return matchName && matchPhone;
+  });
+  refreshCust(filtered);
+}
+
+async function clearSearch() {
+  searchName.value = '';
+  searchPhone.value = '';
+  refreshCust();
+}
+
+document.getElementById('saveCustomer').onclick = async () => {
+  const isEdit = document.getElementById('editMode').value === 'true';
+  const code = isEdit ? custCode.value : await nextCust();
+  
+  const customerData = {
+    code,
+    name: custName.value,
+    addr: custAddr.value,
+    phone: custPhone.value,
+    gst: custGst.value,
+    mail: custMail.value
+  };
+  
+  if (isEdit) {
+    await dbOps.put('customers', customerData);
+    alert('Customer updated!');
+  } else {
+    await dbOps.add('customers', customerData);
+    alert('Customer saved!');
+  }
+  
+  document.getElementById('editMode').value = 'false';
+  document.getElementById('custTitle').innerText = 'Customer Creation';
+  document.getElementById('saveCustomer').innerText = 'Save Customer';
+  document.getElementById('cancelEdit').style.display = 'none';
+  
+  clearCustomerForm();
+  custCode.value = await nextCust();
+  refreshCust();
+};
+
+// LOAD CUSTOMER → SERVICE
+function loadIntoService(code, name) {
+  document.getElementById('svcCust').value = code;
+  document.getElementById('svcCustName').value = name;
+  document.querySelector('[data-page="service"]').click();
+}
+
+document.getElementById('loadCust').onclick = async () => {
+  const c = await dbOps.get('customers', svcCust.value);
+  if (!c) return alert('Customer not found');
+  svcCustName.value = c.name;
+};
+
+// SERVICE FUNCTIONS
+async function nextSvc() {
+  const count = await dbOps.count('services');
+  return `SR${String(count + 1).padStart(4, '0')}`;
+}
+
+document.getElementById('addRow').onclick = () => {
+  const d = document.createElement('div');
+  d.className = 'svc-row';
+  d.innerHTML = `<input type='date' class='d'><input class='m' placeholder='Model'><select class='ad'><option>Yes</option><option>No</option></select><input class='c' placeholder='Complaint'><select class='ch'><option>Paid</option><option>Free</option></select><input class='s' placeholder='Spare'><input class='di' placeholder='Discount'><input class='f' placeholder='Final'><input type='date' class='r'><input class='re' placeholder='Remarks'><button onclick="this.parentElement.remove()">-</button>`;
+  serviceRows.appendChild(d);
+};
+
+async function refreshSvc() {
+  const services = await dbOps.getAll('services');
+  const tbody = document.getElementById('svcBody');
+  tbody.innerHTML = '';
+  for (const s of services) {
+    const c = await dbOps.get('customers', s.cust);
+    tbody.innerHTML += `<tr><td>${s.svc}</td><td>${c ? c.name : ''}</td><td><button onclick="loadSvc('${s.svc}')">Load</button></td></tr>`;
+  }
+}
+
+document.getElementById('saveService').onclick = async () => {
+  const rows = [];
+  document.querySelectorAll('.svc-row').forEach(r => {
+    rows.push({
+      d: r.querySelector('.d').value,
+      m: r.querySelector('.m').value,
+      ad: r.querySelector('.ad').value,
+      c: r.querySelector('.c').value,
+      ch: r.querySelector('.ch').value,
+      s: r.querySelector('.s').value,
+      di: r.querySelector('.di').value,
+      f: r.querySelector('.f').value,
+      rp: r.querySelector('.r').value,
+      re: r.querySelector('.re').value
+    });
+  });
+  const svcNo = await nextSvc();
+  await dbOps.add('services', {
+    svc: svcNo,
+    cust: svcCust.value,
+    rows
+  });
+  alert('Service saved!');
+  serviceRows.innerHTML = '';
+  document.getElementById('svcNo').value = await nextSvc();
+  refreshSvc();
+};
+
+async function loadSvc(id) {
+  const s = await dbOps.get('services', id);
+  if (!s) return;
+  const c = await dbOps.get('customers', s.cust);
+  svcCust.value = s.cust;
+  svcCustName.value = c ? c.name : '';
+  serviceRows.innerHTML = '';
+  s.rows.forEach(x => {
+    addRow.click();
+    const r = [...document.querySelectorAll('.svc-row')].pop();
+    r.querySelector('.d').value = x.d;
+    r.querySelector('.m').value = x.m;
+    r.querySelector('.ad').value = x.ad;
+    r.querySelector('.c').value = x.c;
+    r.querySelector('.ch').value = x.ch;
+    r.querySelector('.s').value = x.s;
+    r.querySelector('.di').value = x.di;
+    r.querySelector('.f').value = x.f;
+    r.querySelector('.r').value = x.rp;
+    r.querySelector('.re').value = x.re;
+  });
+}
+
+// INVOICE FUNCTIONS
+async function nextInv() {
+  const count = await dbOps.count('invoices');
+  return `INV${String(count + 1).padStart(4, '0')}`;
+}
+
+function addInvRow() {
+  const d = document.createElement('div');
+  d.className = 'inv-row';
+  d.innerHTML = `
+    <input class='desc' placeholder='Description'>
+    <input class='item' placeholder='Item Details'>
+    <input type='number' class='qty' placeholder='Qty' value='1' oninput='calcRowTotal(this)'>
+    <input type='number' class='rate' placeholder='Rate' oninput='calcRowTotal(this)'>
+    <input class='amt' placeholder='Amount' readonly>
+    <button onclick="this.parentElement.remove();calculateInvTotal()">-</button>
+  `;
+  invItems.appendChild(d);
+}
+
+function calcRowTotal(el) {
+  const row = el.parentElement;
+  const qty = parseFloat(row.querySelector('.qty').value) || 0;
+  const rate = parseFloat(row.querySelector('.rate').value) || 0;
+  row.querySelector('.amt').value = (qty * rate).toFixed(2);
+  calculateInvTotal();
+}
+
+function calculateInvTotal() {
+  let subtotal = 0;
+  document.querySelectorAll('.inv-row').forEach(r => {
+    const amt = parseFloat(r.querySelector('.amt').value) || 0;
+    subtotal += amt;
+  });
+  
+  const discount = parseFloat(invDiscount.value) || 0;
+  const tax = parseFloat(invTax.value) || 0;
+  
+  const discountAmt = subtotal * (discount / 100);
+  const afterDiscount = subtotal - discountAmt;
+  const taxAmt = afterDiscount * (tax / 100);
+  const total = afterDiscount + taxAmt;
+  
+  invSubtotal.value = subtotal.toFixed(2);
+  invTotal.value = total.toFixed(2);
+}
+
+async function loadInvCustomer() {
+  const c = await dbOps.get('customers', invCustCode.value);
+  if (!c) return alert('Customer not found');
+  invCustName.value = c.name;
+  invCustPhone.value = c.phone;
+  invCustAddr.value = c.addr;
+}
+
+async function saveInvoice() {
+  const items = [];
+  document.querySelectorAll('.inv-row').forEach(r => {
+    items.push({
+      desc: r.querySelector('.desc').value,
+      item: r.querySelector('.item').value,
+      qty: r.querySelector('.qty').value,
+      rate: r.querySelector('.rate').value,
+      amt: r.querySelector('.amt').value
+    });
+  });
+  
+  if (items.length === 0) return alert('Please add at least one item');
+  
+  const invData = {
+    invNo: invNo.value,
+    date: invDate.value,
+    serviceNo: invServiceNo.value,
+    custCode: invCustCode.value,
+    custName: invCustName.value,
+    custPhone: invCustPhone.value,
+    custAddr: invCustAddr.value,
+    items,
+    subtotal: invSubtotal.value,
+    discount: invDiscount.value,
+    tax: invTax.value,
+    total: invTotal.value,
+    payStatus: invPayStatus.value,
+    notes: invNotes.value
+  };
+  
+  await dbOps.add('invoices', invData);
+  alert('Invoice saved!');
+  
+  // Clear form
+  invItems.innerHTML = '';
+  invServiceNo.value = '';
+  invCustCode.value = '';
+  invCustName.value = '';
+  invCustPhone.value = '';
+  invCustAddr.value = '';
+  invDiscount.value = '0';
+  invTax.value = '0';
+  invSubtotal.value = '';
+  invTotal.value = '';
+  invNotes.value = '';
+  
+  invNo.value = await nextInv();
+  invDate.value = new Date().toISOString().split('T')[0];
+  refreshInvoices();
+}
+
+async function refreshInvoices() {
+  const invoices = await dbOps.getAll('invoices');
+  const tbody = document.getElementById('invBody');
+  tbody.innerHTML = '';
+  invoices.forEach(inv => {
+    tbody.innerHTML += `<tr>
+      <td>${inv.invNo}</td>
+      <td>${inv.date}</td>
+      <td>${inv.custName}</td>
+      <td>₹${inv.total}</td>
+      <td>
+        <button onclick="loadInvoice('${inv.invNo}')">Load</button>
+        <button onclick="viewPrintInvoice('${inv.invNo}')" style="background:#4CAF50">View/Print</button>
+      </td>
+    </tr>`;
+  });
+}
+
+async function loadInvoice(invNo) {
+  const inv = await dbOps.get('invoices', invNo);
+  if (!inv) return;
+  
+  document.getElementById('invNo').value = inv.invNo;
+  invDate.value = inv.date;
+  invServiceNo.value = inv.serviceNo;
+  invCustCode.value = inv.custCode;
+  invCustName.value = inv.custName;
+  invCustPhone.value = inv.custPhone;
+  invCustAddr.value = inv.custAddr;
+  invDiscount.value = inv.discount;
+  invTax.value = inv.tax;
+  invSubtotal.value = inv.subtotal;
+  invTotal.value = inv.total;
+  invPayStatus.value = inv.payStatus;
+  invNotes.value = inv.notes;
+  
+  invItems.innerHTML = '';
+  inv.items.forEach(item => {
+    addInvRow();
+    const r = [...document.querySelectorAll('.inv-row')].pop();
+    r.querySelector('.desc').value = item.desc;
+    r.querySelector('.item').value = item.item;
+    r.querySelector('.qty').value = item.qty;
+    r.querySelector('.rate').value = item.rate;
+    r.querySelector('.amt').value = item.amt;
+  });
+}
+
+async function viewPrintInvoice(invNo) {
+  const inv = await dbOps.get('invoices', invNo);
+  if (!inv) return;
+  
+  document.getElementById('printInvNo').innerText = inv.invNo;
+  document.getElementById('printInvDate').innerText = inv.date;
+  document.getElementById('printServiceNo').innerText = inv.serviceNo || 'N/A';
+  document.getElementById('printCustName').innerText = inv.custName;
+  document.getElementById('printCustPhone').innerText = inv.custPhone;
+  document.getElementById('printCustAddr').innerText = inv.custAddr;
+  
+  const printItems = document.getElementById('printItems');
+  printItems.innerHTML = '';
+  inv.items.forEach((item, idx) => {
+    printItems.innerHTML += `<tr>
+      <td>${idx + 1}</td>
+      <td>${item.desc}<br><small style="color:#666">${item.item}</small></td>
+      <td>${item.qty}</td>
+      <td>₹${item.rate}</td>
+      <td>₹${item.amt}</td>
+    </tr>`;
+  });
+  
+  document.getElementById('printSubtotal').innerText = inv.subtotal;
+  document.getElementById('printDiscount').innerText = inv.discount;
+  document.getElementById('printTax').innerText = inv.tax;
+  document.getElementById('printTotal').innerText = inv.total;
+  document.getElementById('printNotes').innerText = inv.notes || 'Thank you for your business!';
+  
+  document.getElementById('printArea').classList.add('active');
+  document.querySelector('.no-print').style.display = 'none';
+}
+
+function printInvoice() {
+  window.print();
+  setTimeout(() => {
+    document.getElementById('printArea').classList.remove('active');
+    document.querySelector('.no-print').style.display = 'block';
+  }, 100);
+}
+
+// FOLLOW-UP FUNCTIONS
+async function refreshFU() {
+  const followups = await dbOps.getAll('followups');
+  const tbody = fuBody;
+  tbody.innerHTML = '';
+  followups.forEach(f => {
+    tbody.innerHTML += `<tr><td>${f.d}</td><td>${f.n}</td><td>${f.p}</td><td>${f.r}</td><td>${f.s}</td></tr>`;
+  });
+}
+
+saveFollow.onclick = async () => {
+  await dbOps.add('followups', {
+    d: fuDate.value,
+    n: fuName.value,
+    p: fuPhone.value,
+    r: fuReq.value,
+    s: fuStatus.value
+  });
+  fuDate.value = '';
+  fuName.value = '';
+  fuPhone.value = '';
+  fuReq.value = '';
+  refreshFU();
+  alert('Follow-up saved!');
+};
+
+// EXPORT FUNCTIONS
+exportCust.onclick = async () => {
+  const customers = await dbOps.getAll('customers');
+  let csv = 'Code,Name,Phone,Address,GST,Mail\n';
+  customers.forEach(c => csv += `${c.code},${c.name},${c.phone},"${c.addr}",${c.gst},${c.mail}\n`);
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'customers.csv';
+  a.click();
+};
+
+exportSvc.onclick = async () => {
+  const services = await dbOps.getAll('services');
+  let csv = 'Svc,Cust,Date,Model,Adopter,Complaint,Charge,Spare,Discount,Final,Repaired,Remark\n';
+  services.forEach(s => s.rows.forEach(r => csv += `${s.svc},${s.cust},${r.d},${r.m},${r.ad},${r.c},${r.ch},${r.s},${r.di},${r.f},${r.rp},"${r.re}"\n`));
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'services.csv';
+  a.click();
+};
+
+exportInv.onclick = async () => {
+  const invoices = await dbOps.getAll('invoices');
+  let csv = 'InvNo,Date,ServiceNo,CustCode,Customer,Phone,Subtotal,Discount,Tax,Total,PayStatus\n';
+  invoices.forEach(inv => csv += `${inv.invNo},${inv.date},${inv.serviceNo},${inv.custCode},${inv.custName},${inv.custPhone},${inv.subtotal},${inv.discount},${inv.tax},${inv.total},${inv.payStatus}\n`);
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'invoices.csv';
+  a.click();
+};
+
+exportFollow.onclick = async () => {
+  const followups = await dbOps.getAll('followups');
+  let csv = 'Date,Name,Phone,Req,Status\n';
+  followups.forEach(f => csv += `${f.d},${f.n},${f.p},"${f.r}",${f.s}\n`);
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'followup.csv';
+  a.click();
+};
+
+// BACKUP & RESTORE
+backupAll.onclick = async () => {
+  const backup = {
+    customers: await dbOps.getAll('customers'),
+    services: await dbOps.getAll('services'),
+    invoices: await dbOps.getAll('invoices'),
+    followups: await dbOps.getAll('followups'),
+    timestamp: new Date().toISOString()
+  };
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `sri_computers_backup_${new Date().toISOString().split('T')[0]}.json`;
+  a.click();
+  alert('Backup created successfully!');
+};
+
+restoreAll.onclick = () => {
+  restoreFile.click();
+};
+
+restoreFile.onchange = async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  
+  const reader = new FileReader();
+  reader.onload = async (event) => {
+    try {
+      const backup = JSON.parse(event.target.result);
+      
+      const tx = db.transaction(['customers', 'services', 'invoices', 'followups'], 'readwrite');
+      await tx.objectStore('customers').clear();
+      await tx.objectStore('services').clear();
+      await tx.objectStore('invoices').clear();
+      await tx.objectStore('followups').clear();
+      
+      for (const c of backup.customers) await dbOps.add('customers', c);
+      for (const s of backup.services) await dbOps.add('services', s);
+      for (const i of backup.invoices || []) await dbOps.add('invoices', i);
+      for (const f of backup.followups) await dbOps.add('followups', f);
+      
+      alert('Data restored successfully!');
+      location.reload();
+    } catch (err) {
+      alert('Error restoring backup: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+};
+
+// INITIALIZE
+initDB().then(async () => {
+  custCode.value = await nextCust();
+  document.getElementById('svcNo').value = await nextSvc();
+  invNo.value = await nextInv();
+  invDate.value = new Date().toISOString().split('T')[0];
+  refreshCust();
+  refreshSvc();
+  refreshInvoices();
+  refreshFU();
+});
+</script>
+</body>
+</html>
